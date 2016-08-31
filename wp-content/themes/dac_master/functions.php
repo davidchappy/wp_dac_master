@@ -1,5 +1,20 @@
 <?php 
 
+function dac_admin_color_schemes() {
+	
+	$theme_dir = get_stylesheet_directory_uri();
+
+	wp_admin_css_color( 
+		'showcase', __( 'Showcase' ),
+		$theme_dir . '/admin-colors/showcase/colors.min.css',
+		array( '#1c1c25', '#ef4035', '#8a8a91', '#fff' )
+	);
+	
+}
+add_action('admin_init', 'dac_admin_color_schemes');
+?>
+<?php 
+
 function theme_styles() {
 
 	wp_enqueue_style( 'bootstrap_css', get_template_directory_uri() . '/css/bootstrap.min.css' ); 
