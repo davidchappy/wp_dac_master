@@ -2,7 +2,7 @@ function edit_tag(m) {
   var name, slug, tr;
   name = jQuery("#name" + m).html();
   slug = jQuery("#slug" + m).html();
-  tr = ' <td id="td_check_'+m+'" ></td> <td id="td_id_'+m+'" ></td> <td id="td_name_'+m+'" class="edit_input"><input id="edit_tagname" name="tagname'+m+'" class="input_th2" type="text" value="'+name+'"></td> <td id="td_slug_'+m+'" class="edit_input"><input id="edit_slug" class="input_th2"  name="slug'+m+'" type="text" value="'+slug+'"></td> <td id="td_count_'+m+'" ></td> <td id="td_edit_'+m+'" class="table_big_col"><a class="wd-btn wd-btn-primary wd-btn-icon wd-btn-save button-small" onclick="save_tag('+m+')" >'+bwg_objectL10B.save_tag+' </a></td><td id="td_delete_'+m+'" class="table_big_col" ></td> ';
+  tr = ' <td id="td_check_'+m+'" ></td> <td id="td_id_'+m+'" ></td> <td id="td_name_'+m+'" class="edit_input"><input id="edit_tagname" name="tagname'+m+'" class="input_th2" type="text" value="'+name+'"></td> <td id="td_slug_'+m+'" class="edit_input"><input id="edit_slug" class="input_th2"  name="slug'+m+'" type="text" value="'+slug+'"></td> <td id="td_count_'+m+'" ></td> <td id="td_edit_'+m+'" class="table_big_col"><a class="wd-btn wd-btn-primary wd-btn-icon wd-btn-save button-small" title="'+ bwg_objectL10B.save_tag +'" onclick="save_tag('+m+')" >'+bwg_objectL10B.save_tag+' </a></td><td id="td_delete_'+m+'" class="table_big_col" ></td> ';
   jQuery("#tr_" + m).html(tr);
   jQuery("#td_id_" + m).attr('class', 'table_big_col');
 }
@@ -59,8 +59,7 @@ function save_tag(tag_id) {
        
       }
       else {
-        jQuery("#wordpress_message_1").css("display", "block");
-         
+        jQuery("#wordpress_message_1").css("display", "none");
       }
     }  
   });
@@ -68,12 +67,6 @@ function save_tag(tag_id) {
 var bwg_save_count = 50;
 function spider_ajax_save(form_id, tr_group) {
   var ajax_task = jQuery("#ajax_task").val();
-  if (!tr_group) {
-    var tr_group = 1;
-  }
-  else if (ajax_task == 'ajax_apply' || ajax_task == 'ajax_save') {
-    ajax_task = '';
-  }
   var bwg_nonce = jQuery("#bwg_nonce").val();
   var name = jQuery("#name").val();
   var slug = jQuery("#slug").val();
@@ -101,6 +94,12 @@ function spider_ajax_save(form_id, tr_group) {
   var image_current_id = jQuery("#image_current_id").val();
   ids_array = ids_string.split(",");
   var tr_count = ids_array.length;
+  if (!tr_group) {
+    var tr_group = 1;
+  }
+  else if ((tr_count > bwg_save_count * tr_group) && (ajax_task == 'ajax_apply' || ajax_task == 'ajax_save')) {
+    ajax_task = '';
+  }
   if (tr_count > bwg_save_count) {
     // Remove items form begin and end of array.
     ids_array.splice(tr_group * bwg_save_count, ids_array.length);
@@ -128,6 +127,11 @@ function spider_ajax_save(form_id, tr_group) {
   post_data["image_current_id"] = image_current_id;
   post_data["image_width"] = jQuery("#image_width").val();
   post_data["image_height"] = jQuery("#image_height").val();
+  post_data["bulk_edit"] = jQuery("#bulk_edit").val();
+  post_data["title"] = jQuery("#title").val();
+  post_data["redirecturl"] = jQuery("#redirecturl").val();
+  post_data["desc"] = jQuery("#desc").val();
+
   var flag = false;
   if (jQuery("#check_all_items").attr('checked') == 'checked') {
     post_data["check_all_items"] = jQuery("#check_all_items").val();
@@ -189,7 +193,7 @@ function spider_ajax_save(form_id, tr_group) {
         jQuery('#message_div').show();
       }
       else if (ajax_task == 'recover') {
-         jQuery('#draganddrop').attr('class','wd_updated');
+        jQuery('#draganddrop').attr('class','wd_updated');
         jQuery('#draganddrop').html("<strong><p>" + bwg_objectL10B.recoverd + "</p></strong>");
         jQuery('#draganddrop').show();
       }
@@ -251,7 +255,6 @@ function spider_ajax_save(form_id, tr_group) {
       else if (ajax_task == 'search') {
         jQuery('#message_div').html("");
         jQuery('#message_div').hide();
-       
       }
       else {
         jQuery('#draganddrop').attr('class','wd_updated');
@@ -259,19 +262,15 @@ function spider_ajax_save(form_id, tr_group) {
         jQuery('#draganddrop').show();
       }
       if (ajax_task == "ajax_save") {
-        
         var $form = jQuery('#' + form_id),
-          formAction = $form.attr( "action" );
-          
-        if ( formAction.indexOf( "?" ) != -1 ) {
+        formAction = $form.attr("action");
+        if (formAction.indexOf("?") != -1) {
           formAction += "&show_pointer=true";
         }
         else {
           formAction += "?show_pointer=true";
         }
-        
-        $form.attr( "action", formAction );
-        
+        $form.attr("action", formAction);
         $form.submit();
       }
       jQuery('#opacity_div').hide();
@@ -420,7 +419,7 @@ function spider_show_hide_weights() {
     jQuery("#tbody_arr").sortable("enable");
     jQuery("#tbody_arr").find(".handle").show(0);
     jQuery("#tbody_arr").find(".handles").closest("td").show(0);
-    jQuery("#tbody_arr").find(".handle").attr('class', 'handle connectedSortable');
+    jQuery("#tbody_arr").find(".handle").attr('class', 'bwg_img_handle handle connectedSortable');
     jQuery("#th_order").hide(0);
     jQuery("#tbody_arr").find(".spider_order").hide(0);
     jQuery("#show_hide_weights").val(bwg_objectL10B.bwg_show_order);
@@ -435,6 +434,7 @@ function spider_check_all_items() {
     jQuery('#check_all').trigger('click');
   // }
 }
+
 function spider_check_all_items_checkbox() {
   if (jQuery('#check_all_items').attr('checked')) {
     jQuery('#check_all_items').attr('checked', false);
@@ -726,6 +726,22 @@ function bwg_add_tag(image_id, tagIds, titles) {
   tb_remove();
 }
 
+function bwg_add_title_desc() {
+  var ids_string = jQuery("#ids_string").val();
+  ids_array = ids_string.split(",");
+  for (var i in ids_array) {
+   if (ids_array.hasOwnProperty(i) && ids_array[i]) {
+      if (jQuery("#check_" + ids_array[i]).attr('checked') == 'checked') {
+        jQuery("#image_alt_text_" + ids_array[i]).val(jQuery("#title").val());
+        jQuery("#redirect_url_" + ids_array[i]).val(jQuery("#redirecturl").val());
+        jQuery("#image_description_" + ids_array[i]).val(jQuery("#desc").val());
+      }
+	  }
+  }
+  jQuery(".opacity_image_desc").hide();
+  jQuery("#bulk_edit").val(1);
+}
+
 function bwg_remove_tag(tag_id, image_id) {
   if (jQuery('#' + image_id + '_tag_' + tag_id)) {
     jQuery('#' + image_id + '_tag_' + tag_id).remove();
@@ -878,26 +894,19 @@ function bwg_built_in_watermark(watermark_type) {
 
 function bwg_change_option_type(type) {
   type = (type == '' ? 1 : type);
-  document.getElementById('type').value = type;
-  for (var i = 1; i <= 10; i++) {
-    if (i == type) {
-      document.getElementById('div_content_' + i).style.display = 'block';
-      document.getElementById('div_' + i).style.background = '#ffffff';
-      document.getElementById('div_' + i).style.color = '#00A0D2';
-      document.getElementById('div_' + i).style.borderLeft = '1px solid #00A0D2';
-      document.getElementById('div_' + i).style.borderTop = '1px solid #00A0D2';
-      document.getElementById('div_' + i).style.borderBottom = '1px solid #00A0D2';
+    if(type <= 7) {
+      jQuery('#type').val(type);
     }
     else {
-      document.getElementById('div_content_' + i).style.display = 'none';
-      document.getElementById('div_' + i).style.background = '#00A0D2';
-      document.getElementById('div_' + i).style.color = '#ffffff';
-      document.getElementById('div_' + i).style.borderLeft = '1px solid #00A0D2';
-      document.getElementById('div_' + i).style.borderTop = '1px solid #00A0D2';
-      document.getElementById('div_' + i).style.borderBottom = '1px solid #00A0D2';
+      jQuery('#type_def').val(type);
     }
-  }
-  document.getElementById('display_panel').style.display = 'inline-block';
+    jQuery('.spider_div_options').hide();
+    jQuery('.spider_default_div_options').hide();
+    jQuery('#div_content_' + type).show();
+    jQuery('.gallery_type').removeClass("active_gallery_type");
+    jQuery('#div_' + type).addClass("active_gallery_type");
+    jQuery('#display_panel').css({'display':'inline-block'});
+    jQuery('#display_default_option_panel').css({'display':'inline-block'});
 }
 
 function bwg_inputs() {
@@ -997,7 +1006,7 @@ function bwg_change_gallery_type(type_to_set, warning_type) {
   
   warning_type = (typeof warning_type === "undefined") ? "default" : warning_type;
 
-  if(type_to_set == 'instagram'){
+  if (type_to_set == 'instagram') {
     jQuery('#gallery_type').val('instagram');
     jQuery('#tr_instagram_post_gallery').show();
     jQuery('#tr_gallery_source').show();
@@ -1013,23 +1022,21 @@ function bwg_change_gallery_type(type_to_set, warning_type) {
     jQuery('#content-add_media').hide();
     jQuery('#show_add_embed').hide();
     jQuery('#show_bulk_embed').hide();
-    
   }
-  else{
-
+  else {
     var ids_string = jQuery("#ids_string").val();
     ids_array = ids_string.split(",");
     var tr_count = ids_array[0]=='' ? 0: ids_array.length;  
     if(tr_count != 0){
       switch(warning_type) {
         case 'default':
-          var allowed = confirm("This action will reset gallery type to standard and will save that choice. You cannot undo it.");
+          var allowed = confirm(bwg_objectL10B.default_warning);
           break;
         case 'change':
-          var allowed = confirm("After pressing save/apply buttons, you cannot change gallery type back to Instagram!");
+          var allowed = confirm(bwg_objectL10B.change_warning);
           break;
         default:
-          var allowed = confirm("This action will reset gallery type to standard and will save that choice. You cannot undo it.");
+          var allowed = confirm(bwg_objectL10B.other_warning);
       }/*endof switch*/
 
       if (allowed == false) {
@@ -1053,8 +1060,7 @@ function bwg_change_gallery_type(type_to_set, warning_type) {
     jQuery('#spider_reset_button').show();
     jQuery('#content-add_media').show();
     jQuery('#show_add_embed').show();
-    jQuery('#show_bulk_embed').show();    
-    
+    jQuery('#show_bulk_embed').show();
   }
   return true;
 }
@@ -1165,52 +1171,103 @@ function bwg_get_embed_info(input_id) {
   return 'ok'; 
    
 }
+
 function bwg_bulk_actions(that, check) {
   var action = jQuery(that).val();
-    if(action == 'delete_all') {
-      if(confirm('Do you want to delete selected items?')) {
-        spider_set_input_value('task',action);
-        if(check == "gallery_page") {
-          jQuery('#galleries_form').submit();
-        }
-        else {
-          jQuery('#albums_form').submit();
-        }
-      }
-      else {
-        return false;
-      }
-    } 
-    else if(action != '' && (check == 'gallery_page' || check == 'album_page')) {
+  if (action == 'delete_all') {
+    if (confirm(bwg_objectL10B.delete_alert)) {
       spider_set_input_value('task',action);
-      if(check == "gallery_page") {
+      if (check == "gallery_page") {
         jQuery('#galleries_form').submit();
+      }
+      else if (check == 'comments_page') {
+        jQuery('#comments_form').submit();
+      }
+      else if (check == 'rates_page') {
+        jQuery('#rates_form').submit();
       }
       else {
         jQuery('#albums_form').submit();
       }
     }
-    else if(action == 'image_get_resize') {
-      jQuery('.opacity_resize_image').show();
-      return false;
-    }
-    else if(action != '' && action != 'image_delete_all') {
-      spider_set_input_value('ajax_task',action);
-      spider_ajax_save('galleries_form');
-      return false;
-    }
-    else if(action == 'image_delete_all') {
-      if(confirm('Do you want to delete selected items?')) {
-        spider_set_input_value('ajax_task',action);
-        spider_ajax_save('galleries_form');
-        return false;
-      }
-      else {
-        return false;
-      }
-    } 
     else {
       return false;
     }
+  }
+  else if (action != '' && (check == 'gallery_page' || check == 'album_page' || check == 'comments_page')) {
+    spider_set_input_value('task',action);
+    if (check == "gallery_page") {
+      jQuery('#galleries_form').submit();
+    }
+    else if (check == 'comments_page') {
+      jQuery('#comments_form').submit();
+    }
+    else {
+      jQuery('#albums_form').submit();
+    }
+  }
+  else if (action == 'image_get_resize') {
+    jQuery('.opacity_resize_image').show();
+    return false;
+  }
+  else if (action == 'image_desc') {
+    jQuery('.opacity_image_desc').show();
+    return false;
+  }
+  else if (action != '' && action != 'image_delete_all') {
+    spider_set_input_value('ajax_task',action);
+    spider_ajax_save('galleries_form');
+    return false;
+  }
+  else if (action == 'image_delete_all') {
+    if (confirm(bwg_objectL10B.delete_alert)) {
+      spider_set_input_value('ajax_task', action);
+      spider_ajax_save('galleries_form');
+      return false;
+    }
+    else {
+      return false;
+    }
+  } 
+  else {
+    return false;
+  }
   return true;
+}
+
+function bwg_change_fonts(cont, google_fonts) {
+  var fonts;
+  if (jQuery("#" + google_fonts).is(":checked") == true) {
+    fonts = bwg_objectGGF;
+  }
+  else {
+    fonts = {'arial' : 'Arial', 'lucida grande' : 'Lucida grande', 'segoe ui' : 'Segoe ui', 'tahoma' : 'Tahoma', 'trebuchet ms' : 'Trebuchet ms', 'verdana' : 'Verdana', 'cursive' : 'Cursive', 'fantasy' : 'Fantasy', 'monospace' : 'Monospace', 'serif' : 'Serif'};
+  }
+  var fonts_option = "";
+  for (var i in fonts) {
+    fonts_option += '<option value="' + i + '">' + fonts[i] + '</option>';
+  }
+  jQuery("#" + cont).html(fonts_option);
+}
+
+function bwg_change_tab(box) {
+  jQuery("#type_option").val(box);
+  if (box == "bwg_default_box") {
+    jQuery(".bwg_default_box").show();
+    jQuery(".standart_option").hide();
+    jQuery('#bwg_default').addClass('bwg_optiontab_active');
+    jQuery("#bwg_standart").removeClass('bwg_optiontab_active');
+    jQuery("#bwg_standart").css({'borderRight':'2px solid #f4f4f4'});
+    jQuery("#bwg_default").css({'borderLeft':'2px solid #E1E1E1'});
+    bwg_change_option_type(jQuery("#type_def").val());
+  }
+  else {
+    jQuery(".bwg_options_box").show();
+    jQuery(".default_option").hide();
+    jQuery('#bwg_standart').addClass('bwg_optiontab_active');
+    jQuery("#bwg_default").removeClass('bwg_optiontab_active');
+    jQuery("#bwg_default").css({'borderLeft':'2px solid #f4f4f4'});
+    jQuery("#bwg_standart").css({'borderRight':'2px solid #E1E1E1'});
+    bwg_change_option_type(jQuery("#type").val());
+  }
 }

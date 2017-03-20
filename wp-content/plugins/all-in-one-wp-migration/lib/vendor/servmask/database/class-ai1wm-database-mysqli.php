@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2016 ServMask Inc.
+ * Copyright (C) 2014-2017 ServMask Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,8 +41,8 @@ class Ai1wm_Database_Mysqli extends Ai1wm_Database {
 	 * @param  string $input String to escape
 	 * @return string
 	 */
-	public function quote( $input ) {
-		return "'" . mysqli_real_escape_string( $this->wpdb->dbh, $input ) . "'";
+	public function escape( $input ) {
+		return mysqli_real_escape_string( $this->wpdb->dbh, $input );
 	}
 
 	/**
@@ -61,6 +61,15 @@ class Ai1wm_Database_Mysqli extends Ai1wm_Database {
 	 */
 	public function error() {
 		return mysqli_error( $this->wpdb->dbh );
+	}
+
+	/**
+	 * Return server version
+	 *
+	 * @return string
+	 */
+	public function version() {
+		return mysqli_get_server_info( $this->wpdb->dbh );
 	}
 
 	/**

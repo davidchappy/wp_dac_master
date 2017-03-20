@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2016 ServMask Inc.
+ * Copyright (C) 2014-2017 ServMask Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,12 +43,28 @@ abstract class Ai1wm_Archiver {
 		'a4096' // path
 	);
 
+	public function get_block_format() {
+		return $this->block_format;
+	}
+
+	public function set_block_format( $block_format ) {
+		$this->block_format = $block_format;
+	}
+
 	/**
 	 * Filename including path to the file
 	 *
 	 * @type string
 	 */
 	protected $filename = null;
+
+	public function get_filename() {
+		return $this->filename;
+	}
+
+	public function set_filename( $filename ) {
+		$this->filename = $filename;
+	}
 
 	/**
 	 * Handle to the file
@@ -57,6 +73,14 @@ abstract class Ai1wm_Archiver {
 	 */
 	protected $file_handle = null;
 
+	public function get_file_handle() {
+		return $this->file_handle;
+	}
+
+	public function set_file_handle( $file_handle ) {
+		$this->file_handle = $file_handle;
+	}
+
 	/**
 	 * Current file size
 	 *
@@ -64,12 +88,28 @@ abstract class Ai1wm_Archiver {
 	 */
 	protected $current_filesize = null;
 
+	public function get_current_filesize() {
+		return $this->current_filesize;
+	}
+
+	public function set_current_filesize( $current_filesize ) {
+		$this->current_filesize = $current_filesize;
+	}
+
 	/**
 	 * End Of File block string
 	 *
 	 * @type string
 	 */
 	protected $eof = null;
+
+	public function get_eof() {
+		return $this->eof;
+	}
+
+	public function set_eof( $eof ) {
+		$this->eof = $eof;
+	}
 
 	/**
 	 * Default constructor
@@ -85,6 +125,7 @@ abstract class Ai1wm_Archiver {
 		// initialize end of file
 		$this->eof = pack( 'a4377', '' );
 
+		// open file for writing or reading
 		if ( $write ) {
 			$this->file_handle = $this->open_file_for_writing( $filename );
 		} else {
@@ -138,16 +179,7 @@ abstract class Ai1wm_Archiver {
 	 * @throws \Ai1wm_Not_Accesible_Exception
 	 */
 	protected function open_file_in_mode( $file, $mode ) {
-		// open the file for writing in binary mode
-		$file_handle = @fopen( $file, $mode );
-
-		// check if we have a handle
-		if ( false === $file_handle ) {
-			// we couldn't open the file
-			throw new Ai1wm_Not_Accesible_Exception( sprintf( __( 'Unable to open %s', AI1WM_PLUGIN_NAME ), $file ) );
-		}
-
-		return $file_handle;
+		return ai1wm_open( $file, $mode );
 	}
 
 	/**
@@ -155,15 +187,11 @@ abstract class Ai1wm_Archiver {
 	 *
 	 * @param resource $handle File handle
 	 * @param string   $data   Data to be written - binary
-	 * @param string   $file   Filename that the file handle belongs to
 	 *
 	 * @throws \Ai1wm_Not_Writable_Exception
 	 */
-	protected function write_to_handle( $handle, $data, $file ) {
-		$result = @fwrite( $handle, $data );
-		if ( false === $result || ( ! empty( $data ) && 0 === $result ) ) {
-			throw new Ai1wm_Not_Writable_Exception( sprintf( __( 'Unable to write %s', AI1WM_PLUGIN_NAME ), $file ) );
-		}
+	protected function write_to_handle( $handle, $data ) {
+		return ai1wm_write( $handle, $data );
 	}
 
 	/**
@@ -171,18 +199,12 @@ abstract class Ai1wm_Archiver {
 	 *
 	 * @param resource $handle File handle
 	 * @param int      $size   Size of data to be read in bytes
-	 * @param string   $file   Filename that the file handle belongs to
 	 *
 	 * @return string Content that was read
 	 * @throws \Ai1wm_Not_Readable_Exception
 	 */
-	protected function read_from_handle( $handle, $size, $file ) {
-		$result = @fread( $handle, $size );
-		if ( false === $result ) {
-			throw new Ai1wm_Not_Readable_Exception( sprintf( __( 'Unable to read %s', AI1WM_PLUGIN_NAME ), $file ) );
-		}
-
-		return $result;
+	protected function read_from_handle( $handle, $size ) {
+		return ai1wm_read( $handle, $size );
 	}
 
 	/**
@@ -191,7 +213,7 @@ abstract class Ai1wm_Archiver {
 	 * @throws \Ai1wm_Not_Writable_Exception
 	 */
 	protected function append_eof() {
-		$this->write_to_handle( $this->file_handle, $this->eof, $this->filename );
+		return $this->write_to_handle( $this->file_handle, $this->eof );
 	}
 
 	/**
@@ -204,7 +226,7 @@ abstract class Ai1wm_Archiver {
 
 		// set file offset
 		if ( fseek( $this->file_handle, -4377, SEEK_END ) !== -1 ) {
-			if ( fread( $this->file_handle, 4377 ) === $this->eof ) {
+			if ( ai1wm_read( $this->file_handle, 4377 ) === $this->eof ) {
 				if ( fseek( $this->file_handle, $offset, SEEK_SET ) !== -1 ) {
 					return true;
 				}
@@ -215,23 +237,13 @@ abstract class Ai1wm_Archiver {
 	}
 
 	/**
-	 * Get current file size
-	 *
-	 * return int
-	 */
-	public function get_current_filesize() {
-		return $this->current_filesize;
-	}
-
-	/**
 	 * Closes the archive file
 	 *
 	 * We either close the file or append the end of file block if complete argument is set to tru
 	 *
-	 * @param bool $complete Flag to append end of file block
+	 * @param  bool $complete Flag to append end of file block
+	 * @return void
 	 *
-	 * @throws \Ai1wm_Not_Accesible_Exception
-	 * @throws \Ai1wm_Not_Writable_Exception
 	 */
 	public function close( $complete = false ) {
 		// are we done appending to the file?
@@ -240,11 +252,6 @@ abstract class Ai1wm_Archiver {
 		}
 
 		// close the file
-		$result = fclose( $this->file_handle );
-
-		if ( false === $result ) {
-			// unable to close the file
-			throw new Ai1wm_Not_Accesible_Exception( sprintf( __( 'Unable to close %s', AI1WM_PLUGIN_NAME ), $this->filename ) );
-		}
+		ai1wm_close( $this->file_handle );
 	}
 }

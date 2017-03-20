@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2016 ServMask Inc.
+ * Copyright (C) 2014-2017 ServMask Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -69,7 +69,7 @@ class Ai1wm_Updater {
 
 		// Get extension updates
 		foreach ( $updates as $slug => $update ) {
-			if ( isset( $extensions[ $slug ]) && ( $extension = $extensions[ $slug ] ) ) {
+			if ( isset( $extensions[ $slug ] ) && ( $extension = $extensions[ $slug ] ) ) {
 				if ( get_option( $extension['key'] ) ) {
 					if ( version_compare( $extension['version'], $update['version'], '<' ) ) {
 

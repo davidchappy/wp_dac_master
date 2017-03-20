@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2016 ServMask Inc.
+ * Copyright (C) 2014-2017 ServMask Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -113,6 +113,14 @@ abstract class Ai1wm_Database {
 	protected $number_of_replaces = 0;
 
 	/**
+	 * Visual Composer
+	 *
+	 * @access protected
+	 * @var bool
+	 */
+	protected $visual_composer = false;
+
+	/**
 	 * Constructor
 	 *
 	 * @param  object $wpdb WPDB instance
@@ -120,6 +128,20 @@ abstract class Ai1wm_Database {
 	 */
 	public function __construct( $wpdb ) {
 		$this->wpdb = $wpdb;
+
+		// Set database host (HyberDB)
+		if ( empty( $this->wpdb->dbhost ) ) {
+			if ( isset( $this->wpdb->last_used_server['host'] ) ) {
+				$this->wpdb->dbhost = $this->wpdb->last_used_server['host'];
+			}
+		}
+
+		// Set database name (HyperDB)
+		if ( empty( $this->wpdb->dbname ) ) {
+			if ( isset( $this->wpdb->last_used_server['name'] ) ) {
+				$this->wpdb->dbname = $this->wpdb->last_used_server['name'];
+			}
+		}
 	}
 
 	/**
@@ -223,14 +245,12 @@ abstract class Ai1wm_Database {
 	 * Get table query clauses
 	 *
 	 * @param  string $table Table name
-	 * @return array
+	 * @return mixed
 	 */
 	public function get_table_query_clauses( $table ) {
 		if ( isset( $this->table_query_clauses[ strtolower( $table ) ] ) ) {
 			return $this->table_query_clauses[ strtolower( $table ) ];
 		}
-
-		return array();
 	}
 
 	/**
@@ -252,14 +272,12 @@ abstract class Ai1wm_Database {
 	 * Get table prefix columns
 	 *
 	 * @param  string $table Table name
-	 * @return array
+	 * @return mixed
 	 */
 	public function get_table_prefix_columns( $table ) {
 		if ( isset( $this->table_prefix_columns[ strtolower( $table ) ] ) ) {
 			return $this->table_prefix_columns[ strtolower( $table ) ];
 		}
-
-		return array();
 	}
 
 	/**
@@ -302,6 +320,27 @@ abstract class Ai1wm_Database {
 	 */
 	public function get_exclude_table_prefixes() {
 		return $this->exclude_table_prefixes;
+	}
+
+	/**
+	 * Set Visual Composer
+	 *
+	 * @param  bool $active Is Visual Composer Active?
+	 * @return Ai1wm_Database
+	 */
+	public function set_visual_composer( $active ) {
+		$this->visual_composer = $active;
+
+		return $this;
+	}
+
+	/**
+	 * Get Visual Composer
+	 *
+	 * @return bool
+	 */
+	public function get_visual_composer() {
+		return $this->visual_composer;
 	}
 
 	/**
@@ -366,24 +405,34 @@ abstract class Ai1wm_Database {
 	/**
 	 * Export database into a file
 	 *
-	 * @param  string $file_name Name of file
+	 * @param  string $file_name            Name of file
+	 * @param  string $current_table_index  Current table index
+	 * @param  int    $timeout              Process timeout
 	 * @return bool
 	 */
-	public function export( $file_name ) {
-
+	public function export( $file_name, &$current_table_index = 0, $timeout = 0 ) {
 		// Set file handler
-		$file_handler = fopen( $file_name, 'wb' );
-		if ( $file_handler === false ) {
-			throw new Exception( 'Unable to open database file' );
-		}
+		$file_handler = ai1wm_open( $file_name, 'ab' );
 
 		// Write headers
-		if ( fwrite( $file_handler, $this->get_header() ) === false ) {
-			throw new Exception( 'Unable to write database header information' );
+		if ( $current_table_index === 0 ) {
+			ai1wm_write( $file_handler, $this->get_header() );
 		}
 
+		// Start time
+		$start = microtime( true );
+
+		// Flag to hold if all tables have been processed
+		$completed = true;
+
+		// Get tables
+		$tables = $this->get_tables();
+
 		// Export tables
-		foreach ( $this->get_tables() as $table_name ) {
+		for ( ; $current_table_index < count( $tables ); ) {
+
+			// Get table name
+			$table_name = $tables[ $current_table_index ];
 
 			// Replace table name prefixes
 			$new_table_name = $this->replace_table_prefixes( $table_name, 0 );
@@ -399,109 +448,96 @@ abstract class Ai1wm_Database {
 			if ( isset( $table['Create Table'] ) ) {
 
 				// Write table drop statement
-				$drop_table = "DROP TABLE IF EXISTS `$new_table_name`;\n";
+				$drop_table = "\nDROP TABLE IF EXISTS `$new_table_name`;\n";
 
 				// Write table statement
-				if ( fwrite( $file_handler, $drop_table ) === false ) {
-					throw new Exception( 'Unable to write database table statement' );
-				}
+				ai1wm_write( $file_handler, $drop_table );
 
 				// Replace create table prefixes
 				$create_table = $this->replace_table_prefixes( $table['Create Table'], 14 );
 
-				// Strip table constraints
-				$create_table = $this->strip_table_constraints( $create_table );
+				// Replace table constraints
+				$create_table = $this->replace_table_constraints( $create_table );
+
+				// Replace create table options
+				$create_table = $this->replace_table_options( $create_table );
 
 				// Write table structure
-				if ( fwrite( $file_handler, $create_table ) === false ) {
-					throw new Exception( 'Unable to write database table structure' );
-				}
+				ai1wm_write( $file_handler, $create_table );
 
 				// Write end of statement
-				if ( fwrite( $file_handler, ";\n\n" ) === false ) {
-					throw new Exception( 'Unable to write database end of statement' );
+				ai1wm_write( $file_handler, ";\n\n" );
+			}
+
+			$current_table_offset = 0;
+
+			// Set query
+			$query = sprintf( "SELECT * FROM `$table_name` %s", $this->get_table_query_clauses( $table_name ) );
+
+			// Apply additional table prefix columns
+			$columns = $this->get_table_prefix_columns( $table_name );
+
+			// Get results
+			$result = $this->query( $query );
+
+			// Generate insert statements
+			while ( $row = $this->fetch_assoc( $result ) ) {
+				if ( $current_table_offset % Ai1wm_Database::QUERIES_PER_TRANSACTION === 0 ) {
+					// Write start transaction
+					ai1wm_write( $file_handler, "START TRANSACTION;\n" );
 				}
 
-				// Set query
-				$query = "SELECT * FROM `$table_name` ";
+				$items = array();
+				foreach ( $row as $key => $value ) {
+					// Replace table prefix columns
+					if ( isset( $columns[ strtolower( $key ) ] ) ) {
+						$value = $this->replace_table_prefixes( $value, 0 );
+					}
 
-				// Apply additional table query clauses
-				if ( ( $query_clauses = $this->get_table_query_clauses( $table_name ) ) ) {
-					$query .= $query_clauses;
+					// Replace table values
+					$items[] = is_null( $value ) ? 'NULL' : "'" . $this->replace_table_export_values( $this->escape( $value ) ) . "'";
 				}
 
-				// Apply additional table prefix columns
-				$columns = $this->get_table_prefix_columns( $table_name );
+				// Set table values
+				$table_values = implode( ',', $items );
 
-				// Get results
-				$result = $this->query( $query );
+				// Set insert statement
+				$table_insert = "INSERT INTO `$new_table_name` VALUES ($table_values);\n";
 
-				$processed_rows = 0;
+				// Write insert statement
+				ai1wm_write( $file_handler, $table_insert );
 
-				// Generate insert statements
-				while ( $row = $this->fetch_assoc( $result ) ) {
-					if ( $processed_rows === 0 ) {
-						// Write start transaction
-						if ( fwrite( $file_handler, "START TRANSACTION;\n" ) === false ) {
-							throw new Exception( 'Unable to write database start transaction' );
-						}
-					}
-
-					$items = array();
-					foreach ( $row as $key => $value ) {
-						// Replace table prefix columns
-						if ( isset( $columns[ strtolower( $key ) ] ) ) {
-							$value = $this->replace_table_prefixes( $value, 0 );
-						}
-
-						// Replace table values
-						$items[] = is_null( $value ) ? 'NULL' : $this->quote( $this->replace_table_values( $value ) );
-					}
-
-					// Set table values
-					$table_values = implode( ',', $items );
-
-					// Set insert statement
-					$table_insert = "INSERT INTO `$new_table_name` VALUES ($table_values);\n";
-
-					// Write insert statement
-					if ( fwrite( $file_handler, $table_insert ) === false ) {
-						throw new Exception( 'Unable to write database insert statement' );
-					}
-
-					$processed_rows++;
-
-					// Write end of transaction
-					if ( $processed_rows === Ai1wm_Database::QUERIES_PER_TRANSACTION ) {
-						if (fwrite( $file_handler, "COMMIT;\n" ) === false ) {
-							throw new Exception( 'Unable to write database end of transaction' );
-						}
-
-						$processed_rows = 0;
-					}
-				}
+				$current_table_offset++;
 
 				// Write end of transaction
-				if ( $processed_rows !== 0 ) {
-					if ( fwrite( $file_handler, "COMMIT;\n" ) === false ) {
-						throw new Exception( 'Unable to write database end of transaction' );
-					}
+				if ( $current_table_offset % Ai1wm_Database::QUERIES_PER_TRANSACTION === 0 ) {
+					ai1wm_write( $file_handler, "COMMIT;\n" );
 				}
+			}
 
-				// Write end of statements
-				if ( fwrite( $file_handler, "\n" ) === false ) {
-					throw new Exception( 'Unable to write database end of statement' );
+			// Write end of transaction
+			if ( $current_table_offset % Ai1wm_Database::QUERIES_PER_TRANSACTION !== 0 ) {
+				ai1wm_write( $file_handler, "COMMIT;\n" );
+			}
+
+			$current_table_index += 1;
+
+			// Close result cursor
+			$this->free_result( $result );
+
+			// Time elapsed
+			if ( $timeout ) {
+				if ( ( microtime( true ) - $start ) > $timeout ) {
+					$completed = false;
+					break;
 				}
-
-				// Close result cursor
-				$this->free_result( $result );
 			}
 		}
 
 		// Close file handler
-		fclose( $file_handler );
+		ai1wm_close( $file_handler );
 
-		return true;
+		return $completed;
 	}
 
 	/**
@@ -511,18 +547,11 @@ abstract class Ai1wm_Database {
 	 * @return bool
 	 */
 	public function import( $file_name ) {
-
-		// Set collation name
-		$collation = $this->get_collation( 'utf8mb4_general_ci' );
-
 		// Set max allowed packet
 		$max_allowed_packet = $this->get_max_allowed_packet();
 
 		// Set file handler
-		$file_handler = fopen( $file_name, 'r' );
-		if ($file_handler === false) {
-			throw new Exception( 'Unable to open database file' );
-		}
+		$file_handler = ai1wm_open( $file_name, 'r' );
 
 		$passed = 0;
 		$failed = 0;
@@ -541,13 +570,11 @@ abstract class Ai1wm_Database {
 					// Replace table prefixes
 					$query = $this->replace_table_prefixes( $query );
 
-					// Replace table values
-					$query = $this->replace_table_values( $query, true );
+					// Replace table collations
+					$query = $this->replace_table_collations( $query );
 
-					// Replace table collation
-					if ( empty( $collation ) ) {
-						$query = $this->replace_table_collation( $query );
-					}
+					// Replace table values
+					$query = $this->replace_table_import_values( $query );
 
 					try {
 
@@ -572,7 +599,7 @@ abstract class Ai1wm_Database {
 		}
 
 		// Close file handler
-		fclose( $file_handler );
+		ai1wm_close( $file_handler );
 
 		// Check failed queries
 		if ( ( ( $failed / $passed ) * 100 ) > 2 ) {
@@ -616,9 +643,9 @@ abstract class Ai1wm_Database {
 	}
 
 	/**
-	 * Get MySQL max allowed packaet
+	 * Get MySQL max allowed packet
 	 *
-	 * @return integer
+	 * @return int
 	 */
 	protected function get_max_allowed_packet() {
 		$max_allowed_packet = null;
@@ -664,7 +691,7 @@ abstract class Ai1wm_Database {
 	 * Replace table prefixes
 	 *
 	 * @param  string  $input    Table value
-	 * @param  boolean $position Replace first occurrence at a specified position
+	 * @param  bool    $position Replace first occurrence at a specified position
 	 * @return string
 	 */
 	protected function replace_table_prefixes( $input, $position = false ) {
@@ -689,64 +716,82 @@ abstract class Ai1wm_Database {
 	}
 
 	/**
-	 * Replace table values
+	 * Replace table export values
 	 *
 	 * @param  string  $input Table value
-	 * @param  boolean $parse Parse value
 	 * @return string
 	 */
-	protected function replace_table_values( $input, $parse = false ) {
-		// Get replace values
-		$old = $this->get_old_replace_values();
-		$new = $this->get_new_replace_values();
+	protected function replace_table_export_values( $input ) {
+		$this->number_of_replaces = 0;
 
-		$old_values = array();
-		$new_values = array();
+		// Serialization format
+		$array  = '(a:\d+:{.+?})';
+		$string = '(s:\d+:\\\\?"(.+?)\\\\?";)';
+		$object = '(O:\d+:\\\\?"(.+?)\\\\?":\d+:{.*?})';
 
-		// Prepare replace values
-		for ( $i = 0; $i < count( $old ); $i++ ) {
-			if ( stripos( $input, $old[$i] ) !== false ) {
-				$old_values[] = $old[$i];
-				$new_values[] = $new[$i];
-			}
+		// Replace base64 encoded values (Visual Composer)
+		if ( $this->get_visual_composer() ) {
+			$input = preg_replace_callback( "/(?<=\[vc_raw_html\])(.+?)(?=\[\/vc_raw_html\])/S", array( $this, 'replace_base64_values_callback' ), $input );
 		}
 
-		// Do replace values
-		if ( $old_values ) {
-			if ( $parse ) {
-				return $this->parse_serialized_values( $old_values, $new_values, $input );
-			}
+		// Replace serialized values
+		$input = preg_replace_callback( "/(?<=\A)($array|$string|$object)(?=\z)/S", array( $this, 'replace_serialized_values_callback' ), $input );
 
-			return Ai1wm_Database_Utility::replace_serialized_values( $old_values, $new_values, $input );
+		// Replace values
+		if ( $this->number_of_replaces === 0 ) {
+			$input = Ai1wm_Database_Utility::replace_values( $this->get_old_replace_values(), $this->get_new_replace_values(), $input );
 		}
 
 		return $input;
 	}
 
 	/**
-	 * Parse serialized values
+	 * Replace table import values
 	 *
-	 * @param  array  $old_values Old replace values
-	 * @param  array  $new_values New replace values
-	 * @param  string $input      Table value
+	 * @param  string  $input Table value
 	 * @return string
 	 */
-	protected function parse_serialized_values( $old_values, $new_values, $input ) {
-		// Serialization format
-		$array  = '(a:\d+:{.*?})';
-		$string = '(s:\d+:".*?")';
-		$object = '(O:\d+:".+":\d+:{.*})';
-
-		// Number of serialized replaces
+	protected function replace_table_import_values( $input ) {
 		$this->number_of_replaces = 0;
 
+		// Serialization format
+		$array  = '(a:\d+:{.+?})';
+		$string = '(s:\d+:\\\\?"(.+?)\\\\?";)';
+		$object = '(O:\d+:\\\\?"(.+?)\\\\?":\d+:{.*?})';
+
+		// Replace base64 encoded values (Visual Composer)
+		if ( $this->get_visual_composer() ) {
+			$input = preg_replace_callback( "/(?<=\[vc_raw_html\])(.+?)(?=\[\/vc_raw_html\])/S", array( $this, 'replace_base64_values_callback' ), $input );
+		}
+
 		// Replace serialized values
-		$input = preg_replace_callback( "/'($array|$string|$object)'/", array( $this, 'replace_serialized_values' ), $input );
+		$input = preg_replace_callback( "/(?<=')($array|$string|$object)(?=')/S", array( $this, 'replace_serialized_values_callback' ), $input );
 
 		// Replace values
 		if ( $this->number_of_replaces === 0 ) {
-			$input = Ai1wm_Database_Utility::replace_values( $old_values, $new_values, $input );
+			$input = Ai1wm_Database_Utility::replace_values( $this->get_old_replace_values(), $this->get_new_replace_values(), $input );
 		}
+
+		return $input;
+	}
+
+	/**
+	 * Replace base64 values (callback)
+	 *
+	 * @param  array  $matches List of matches
+	 * @return string
+	 */
+	protected function replace_base64_values_callback( $matches ) {
+		$this->number_of_replaces++;
+
+		// Decode base64 characters
+		$input = rawurldecode( base64_decode( strip_tags( $matches[1] ) ) );
+
+		// Replace serialized values
+		$input = Ai1wm_Database_Utility::replace_values( $this->get_old_replace_values(), $this->get_new_replace_values(), $input );
+
+		// Encode base64 characters
+		$input = base64_encode( rawurlencode( $input ) );
 
 		return $input;
 	}
@@ -757,7 +802,7 @@ abstract class Ai1wm_Database {
 	 * @param  array  $matches List of matches
 	 * @return string
 	 */
-	protected function replace_serialized_values( $matches ) {
+	protected function replace_serialized_values_callback( $matches ) {
 		$this->number_of_replaces++;
 
 		// Unescape MySQL special characters
@@ -766,33 +811,88 @@ abstract class Ai1wm_Database {
 		// Replace serialized values
 		$input = Ai1wm_Database_Utility::replace_serialized_values( $this->get_old_replace_values(), $this->get_new_replace_values(), $input );
 
-		// Prepare query values
-		return $this->quote( $input );
+		// Escape MySQL special characters
+		$input = Ai1wm_Database_Utility::escape_mysql( $input );
+
+		return $input;
 	}
 
 	/**
-	 * Replace table collation
+	 * Replace table collations
 	 *
 	 * @param  string $input SQL statement
 	 * @return string
 	 */
-	protected function replace_table_collation($input) {
-		return str_ireplace( 'utf8mb4', 'utf8', $input );
+	protected function replace_table_collations( $input ) {
+		static $search = array();
+		static $replace = array();
+
+		// Replace table collations
+		if ( empty( $search ) || empty( $replace ) ) {
+			if ( ! $this->wpdb->has_cap( 'utf8mb4_520' ) ) {
+				if ( ! $this->wpdb->has_cap( 'utf8mb4' ) ) {
+					$search  = array( 'utf8mb4_unicode_520_ci', 'utf8mb4' );
+					$replace = array( 'utf8_unicode_ci', 'utf8' );
+				} else {
+					$search  = array( 'utf8mb4_unicode_520_ci' );
+					$replace = array( 'utf8mb4_unicode_ci' );
+				}
+			}
+		}
+
+		return str_ireplace( $search, $replace, $input );
 	}
 
 	/**
-	 * Strip table constraints
+	 * Replace table constraints
 	 *
 	 * @param  string $input SQL statement
 	 * @return string
 	 */
-	protected function strip_table_constraints($input) {
+	protected function replace_table_constraints( $input ) {
 		$pattern = array(
 			'/\s+CONSTRAINT(.+)REFERENCES(.+),/i',
 			'/,\s+CONSTRAINT(.+)REFERENCES(.+)/i',
 		);
 
 		return preg_replace( $pattern, '', $input );
+	}
+
+	/**
+	 * Replace table options
+	 *
+	 * @param  string $input SQL statement
+	 * @return string
+	 */
+	protected function replace_table_options( $input ) {
+		// Set table replace options
+		$search = array(
+			'ENGINE=Aria',
+			'TRANSACTIONAL=0',
+			'TRANSACTIONAL=1',
+			'PAGE_CHECKSUM=0',
+			'PAGE_CHECKSUM=1',
+			'TABLE_CHECKSUM=0',
+			'TABLE_CHECKSUM=1',
+			'ROW_FORMAT=PAGE',
+			'ROW_FORMAT=FIXED',
+			'ROW_FORMAT=DYNAMIC',
+
+		);
+		$replace = array(
+			'ENGINE=MyISAM',
+			'',
+			'',
+			'',
+			'',
+			'',
+			'',
+			'',
+			'',
+			'',
+		);
+
+		return str_ireplace( $search, $replace, $input );
 	}
 
 	/**
@@ -832,21 +932,28 @@ abstract class Ai1wm_Database {
 	 * @param  string $input String to escape
 	 * @return string
 	 */
-	abstract public function quote( $input );
+	abstract public function escape( $input );
 
 	/**
-	 * Returns the error code for the most recent function call
+	 * Return the error code for the most recent function call
 	 *
 	 * @return int
 	 */
 	abstract public function errno();
 
 	/**
-	 * Returns a string description of the last error
+	 * Return a string description of the last error
 	 *
 	 * @return string
 	 */
 	abstract public function error();
+
+	/**
+	 * Return server version
+	 *
+	 * @return string
+	 */
+	abstract public function version();
 
 	/**
 	 * Return the result from MySQL query as associative array

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2016 ServMask Inc.
+ * Copyright (C) 2014-2017 ServMask Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -69,7 +69,7 @@ function ai1wm_archive_path( $params ) {
 	}
 
 	// Get archive path
-	if ( empty( $params['backups'] ) ) {
+	if ( empty( $params['ai1wm_manual_backups'] ) ) {
 		return ai1wm_storage_path( $params ) . DIRECTORY_SEPARATOR . basename( $params['archive'] );
 	}
 
@@ -166,15 +166,6 @@ function ai1wm_error_path() {
 }
 
 /**
- * Get status.js absolute path
- *
- * @return string
- */
-function ai1wm_status_path() {
-	return AI1WM_STORAGE_PATH . DIRECTORY_SEPARATOR . AI1WM_STATUS_NAME;
-}
-
-/**
  * Get WordPress content directory
  *
  * @param  string $path Relative path
@@ -265,7 +256,7 @@ function ai1wm_parse_size( $size, $default = null ) {
 
 	// Parse size format
 	if ( preg_match( '/([0-9]+)\s*(k|m|g)?(b?(ytes?)?)/i', $size, $match ) ) {
-		return $match[1] * $suffixes[strtolower( $match[2] )];
+		return $match[1] * $suffixes[ strtolower( $match[2] ) ];
 	}
 
 	return $default;
@@ -286,17 +277,18 @@ function ai1wm_site_name() {
  * @return string
  */
 function ai1wm_archive_file() {
-	$site = parse_url( site_url() );
 	$name = array();
 
 	// Add domain
-	if ( isset( $site['host'] ) ) {
-		$name[] = $site['host'];
-	}
+	$name[] = parse_url( site_url(), PHP_URL_HOST );
 
 	// Add path
-	if ( isset( $site['path'] ) ) {
-		$name[] = trim( $site['path'], '/' );
+	if ( ( $path = explode( '/', parse_url( site_url(), PHP_URL_PATH ) ) ) ) {
+		foreach ( $path as $directory ) {
+			if ( $directory ) {
+				$name[] = $directory;
+			}
+		}
 	}
 
 	// Add year, month and day
@@ -308,7 +300,7 @@ function ai1wm_archive_file() {
 	// Add unique identifier
 	$name[] = rand( 100, 999 );
 
-	return sprintf( '%s.wpress', implode( '-', $name ) );
+	return sprintf( '%s.wpress', strtolower( implode( '-', $name ) ) );
 }
 
 /**
@@ -317,20 +309,21 @@ function ai1wm_archive_file() {
  * @return string
  */
 function ai1wm_archive_folder() {
-	$site = parse_url( site_url() );
 	$name = array();
 
 	// Add domain
-	if ( isset( $site['host'] ) ) {
-		$name[] = $site['host'];
-	}
+	$name[] = parse_url( site_url(), PHP_URL_HOST );
 
 	// Add path
-	if ( isset( $site['path'] ) ) {
-		$name[] = trim( $site['path'] , '/' );
+	if ( ( $path = explode( '/', parse_url( site_url(), PHP_URL_PATH ) ) ) ) {
+		foreach ( $path as $directory ) {
+			if ( $directory ) {
+				$name[] = $directory;
+			}
+		}
 	}
 
-	return implode( '-', $name );
+	return strtolower( implode( '-', $name ) );
 }
 
 /**
@@ -348,7 +341,7 @@ function ai1wm_storage_folder() {
  * @param  integer $blog_id Blog ID
  * @return boolean
  */
-function ai1wm_main_site( $blog_id = null) {
+function ai1wm_main_site( $blog_id = null ) {
 	return $blog_id === null || $blog_id === 0 || $blog_id === 1;
 }
 
@@ -388,7 +381,7 @@ function ai1wm_files_path( $blog_id = null ) {
  */
 function ai1wm_blogsdir_path( $blog_id = null ) {
 	if ( ai1wm_main_site( $blog_id ) ) {
-		return "/wp-content/blogs.dir/";
+		return '/wp-content/blogs.dir/';
 	}
 
 	return "/wp-content/blogs.dir/{$blog_id}/files/";
@@ -402,7 +395,7 @@ function ai1wm_blogsdir_path( $blog_id = null ) {
  */
 function ai1wm_blogsdir_url( $blog_id = null ) {
 	if ( ai1wm_main_site( $blog_id ) ) {
-		return get_site_url( $blog_id, "/wp-content/blogs.dir/" );
+		return get_site_url( $blog_id, '/wp-content/blogs.dir/' );
 	}
 
 	return get_site_url( $blog_id, "/wp-content/blogs.dir/{$blog_id}/files/" );
@@ -416,7 +409,7 @@ function ai1wm_blogsdir_url( $blog_id = null ) {
  */
 function ai1wm_uploads_path( $blog_id = null ) {
 	if ( ai1wm_main_site( $blog_id ) ) {
-		return "/wp-content/uploads/";
+		return '/wp-content/uploads/';
 	}
 
 	return "/wp-content/uploads/sites/{$blog_id}/";
@@ -430,7 +423,7 @@ function ai1wm_uploads_path( $blog_id = null ) {
  */
 function ai1wm_uploads_url( $blog_id = null ) {
 	if ( ai1wm_main_site( $blog_id ) ) {
-		return get_site_url( $blog_id, "/wp-content/uploads/" );
+		return get_site_url( $blog_id, '/wp-content/uploads/' );
 	}
 
 	return get_site_url( $blog_id, "/wp-content/uploads/sites/{$blog_id}/" );
@@ -476,11 +469,10 @@ function ai1wm_table_prefix( $blog_id = null ) {
  */
 function ai1wm_content_filters( $filters = array() ) {
 	return array_merge( $filters, array(
-			'index.php',
-			'ai1wm-backups',
-			'themes' . DIRECTORY_SEPARATOR . 'index.php',
-			'plugins' . DIRECTORY_SEPARATOR . 'index.php',
-			'uploads' . DIRECTORY_SEPARATOR . 'index.php',
+		AI1WM_BACKUPS_NAME,
+		AI1WM_PACKAGE_NAME,
+		AI1WM_MULTISITE_NAME,
+		AI1WM_DATABASE_NAME,
 	) );
 }
 
@@ -554,6 +546,13 @@ function ai1wm_plugin_filters( $filters = array() ) {
 		$filters[] = 'plugins' . DIRECTORY_SEPARATOR . 'all-in-one-wp-migration-onedrive-extension';
 	}
 
+	// Box Extension
+	if ( defined( 'AI1WMBE_PLUGIN_BASENAME' ) ) {
+		$filters[] = 'plugins' . DIRECTORY_SEPARATOR . dirname( AI1WMBE_PLUGIN_BASENAME );
+	} else {
+		$filters[] = 'plugins' . DIRECTORY_SEPARATOR . 'all-in-one-wp-migration-box-extension';
+	}
+
 	return $filters;
 }
 
@@ -608,6 +607,11 @@ function ai1wm_active_servmask_plugins( $plugins = array() ) {
 		$plugins[] = AI1WMOE_PLUGIN_BASENAME;
 	}
 
+	// Box Extension
+	if ( defined( 'AI1WMBE_PLUGIN_BASENAME' ) ) {
+		$plugins[] = AI1WMBE_PLUGIN_BASENAME;
+	}
+
 	return $plugins;
 }
 
@@ -627,6 +631,46 @@ function ai1wm_active_sitewide_plugins() {
  */
 function ai1wm_active_plugins() {
 	return array_values( get_option( AI1WM_ACTIVE_PLUGINS, array() ) );
+}
+
+/**
+ * Set active sitewide plugins (inspired by WordPress activate_plugins() function)
+ *
+ * @param  array   $plugins List of plugins
+ * @return boolean
+ */
+function ai1wm_activate_sitewide_plugins( $plugins ) {
+	$current = get_site_option( AI1WM_ACTIVE_SITEWIDE_PLUGINS, array() );
+
+	// Add plugins
+	foreach ( $plugins as $plugin ) {
+		if ( ! isset( $current[ $plugin ] ) && ! is_wp_error( validate_plugin( $plugin ) ) ) {
+			$current[ $plugin ] = time();
+		}
+	}
+
+	return update_site_option( AI1WM_ACTIVE_SITEWIDE_PLUGINS, $current );
+}
+
+/**
+ * Set active plugins (inspired by WordPress activate_plugins() function)
+ *
+ * @param  array   $plugins List of plugins
+ * @return boolean
+ */
+function ai1wm_activate_plugins( $plugins ) {
+	$current = get_option( AI1WM_ACTIVE_PLUGINS, array() );
+
+	// Add plugins
+	foreach ( $plugins as $plugin ) {
+		if ( ! in_array( $plugin, $current ) && ! is_wp_error( validate_plugin( $plugin ) ) ) {
+			$current[] = $plugin;
+		}
+	}
+
+	sort( $current );
+
+	return update_option( AI1WM_ACTIVE_PLUGINS, $current );
 }
 
 /**
@@ -681,29 +725,51 @@ function ai1wm_urldecode( $value ) {
  */
 function ai1wm_open( $file, $mode ) {
 	$file_handle = fopen( $file, $mode );
-
 	if ( false === $file_handle ) {
-		throw new Exception( sprintf( __( 'Unable to open %s with mode %s', AI1WM_PLUGIN_NAME ), $file, $mode ) );
+		throw new Ai1wm_Not_Accesible_Exception( sprintf( __( 'Unable to open %s with mode %s', AI1WM_PLUGIN_NAME ), $file, $mode ) );
 	}
+
 	return $file_handle;
 }
 
 /**
  * Write contents to a file
  *
- * @param  resource $handle File handle to write to
+ * @param  resource $handle  File handle to write to
  * @param  string   $content Contents to write to the file
- * @param  string   $file Filename that contents shall be written to
  * @return int
  * @throws Exception
  */
-function ai1wm_write( $handle, $content, $file ) {
+function ai1wm_write( $handle, $content ) {
 	$write_result = fwrite( $handle, $content );
-
 	if ( false === $write_result ) {
-		throw new Exception( sprintf( __( 'Unable to write to %s.', AI1WM_PLUGIN_NAME ), $file ) );
+		if ( ( $meta = stream_get_meta_data( $handle ) ) ) {
+			throw new Ai1wm_Not_Writable_Exception( sprintf( __( 'Unable to write to: %s', AI1WM_PLUGIN_NAME ), $meta['uri'] ) );
+		}
+	} elseif ( strlen( $content ) !== $write_result ) {
+		throw new Ai1wm_Quota_Exceeded_Exception( __( 'Out of disk space.', AI1WM_PLUGIN_NAME ) );
 	}
+
 	return $write_result;
+}
+
+/**
+ * Read contents from a file
+ *
+ * @param  resource $handle   File handle to read from
+ * @param  string   $filesize File size
+ * @return int
+ * @throws Exception
+ */
+function ai1wm_read( $handle, $filesize ) {
+	$read_result = fread( $handle, $filesize );
+	if ( false === $read_result ) {
+		if ( ( $meta = stream_get_meta_data( $handle ) ) ) {
+			throw new Ai1wm_Not_Readable_Exception( sprintf( __( 'Unable to read file: %s', AI1WM_PLUGIN_NAME ), $meta['uri'] ) );
+		}
+	}
+
+	return $read_result;
 }
 
 /**
@@ -729,15 +795,89 @@ function ai1wm_unlink( $file ) {
 /**
  * Copies one file's contents to another
  *
- * @param  string   $source_file      File to copy the contents from
- * @param  string   $destination_file File to copy the contents to
+ * @param  string $source_file      File to copy the contents from
+ * @param  string $destination_file File to copy the contents to
  */
 function ai1wm_copy( $source_file, $destination_file ) {
 	$source_handle = ai1wm_open( $source_file, 'rb' );
 	$destination_handle = ai1wm_open( $destination_file, 'ab' );
-	while ( $buffer = fread( $source_handle, 4096 ) ) {
-		ai1wm_write( $destination_handle, $buffer, $destination_file );
+	while ( $buffer = ai1wm_read( $source_handle, 4096 ) ) {
+		ai1wm_write( $destination_handle, $buffer );
 	}
 	ai1wm_close( $source_handle );
 	ai1wm_close( $destination_handle );
+}
+
+/**
+ * Get the size of file in bytes
+ *
+ * This method supports files > 2GB on PHP x86
+ *
+ * @param string $file_path Path to the file
+ * @param bool   $as_string Return the filesize as string instead of BigInteger
+ *
+ * @return mixed Math_BigInteger|string|null
+ */
+function ai1wm_filesize( $file_path, $as_string = true ) {
+	$chunk_size = 2000000; // 2MB
+	$file_size  = new Math_BigInteger( 0 );
+
+	try {
+		$file_handle = ai1wm_open( $file_path, 'rb' );
+
+		while ( ! feof( $file_handle ) ) {
+			$bytes     = ai1wm_read( $file_handle, $chunk_size );
+			$file_size = $file_size->add( new Math_BigInteger( strlen( $bytes ) ) );
+		}
+
+		ai1wm_close( $file_handle );
+
+		return $as_string ? $file_size->toString() : $file_size;
+	} catch ( Exception $e ) {
+		return null;
+	}
+}
+
+/**
+ * Return the smaller of two numbers
+ *
+ * @param Math_BigInteger $a First number
+ * @param Math_BigInteger $b Second number
+ *
+ * @return Math_BigInteger
+ */
+function ai1wm_find_smaller_number( Math_BigInteger $a, Math_BigInteger $b ) {
+	if ( $a->compare( $b ) === -1 ) {
+		return $a;
+	}
+
+	return $b;
+}
+
+/**
+ * Wrapper around fseek
+ *
+ * This function works with offsets that are > PHP_INT_MAX
+ *
+ * @param resource        $file_handle Handle to the file
+ * @param Math_BigInteger $offset      Offset of the file
+ */
+function ai1wm_fseek( $file_handle, Math_BigInteger $offset ) {
+	$chunk_size = ai1wm_find_smaller_number( new Math_BigInteger( 2000000 ), $offset );
+	while ( ! feof( $file_handle ) && $offset->toString() != '0' ) {
+		$bytes      = ai1wm_read( $file_handle, $chunk_size->toInteger() );
+		$offset     = $offset->subtract( new Math_BigInteger( strlen( $bytes ) ) );
+		$chunk_size = ai1wm_find_smaller_number( $chunk_size, $offset );
+	}
+}
+
+/**
+ * Disable Jetpack Photon module
+ *
+ * @return void
+ */
+function ai1wm_disable_jetpack_photon() {
+	if ( ( $jetpack = get_option( AI1WM_JETPACK_ACTIVE_MODULES, array() ) ) ) {
+		update_option( AI1WM_JETPACK_ACTIVE_MODULES, array_values( array_diff( $jetpack, array( 'photon' ) ) ) );
+	}
 }

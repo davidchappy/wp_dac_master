@@ -1,5 +1,5 @@
 <div class="ai1wm-report-problem">
-	<button id="ai1wm-report-problem-button" class="ai1wm-button-red">
+	<button type="button" id="ai1wm-report-problem-button" class="ai1wm-button-red">
 		<i class="ai1wm-icon-notification"></i> <?php _e( 'Report issue', AI1WM_PLUGIN_NAME ); ?>
 	</button>
 	<div class="ai1wm-report-problem-dialog">
@@ -10,8 +10,10 @@
 			<textarea rows="3" id="ai1wm-report-message" class="ai1wm-report-message" placeholder="<?php _e( 'Please describe your problem here..', AI1WM_PLUGIN_NAME ); ?>"></textarea>
 		</div>
 		<div class="ai1wm-field ai1wm-report-terms-segment">
-			<input type="checkbox" class="ai1wm-report-terms" id="ai1wm-report-terms" />
-			<label for="ai1wm-report-terms"><?php _e( 'I agree to send my email address, comments and error logs to a ServMask server.', AI1WM_PLUGIN_NAME ); ?></label>
+			<label for="ai1wm-report-terms">
+				<input type="checkbox" class="ai1wm-report-terms" id="ai1wm-report-terms" />
+				<?php _e( 'I agree to send my email address, comments and error logs to a ServMask server.', AI1WM_PLUGIN_NAME ); ?>
+			</label>
 		</div>
 		<div class="ai1wm-field">
 			<div class="ai1wm-buttons">

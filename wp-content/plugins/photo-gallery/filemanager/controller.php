@@ -22,27 +22,20 @@ class FilemanagerController {
     ////////////////////////////////////////////////////////////////////////////////////////
     // Constructor & Destructor                                                           //
     ////////////////////////////////////////////////////////////////////////////////////////
-    
+
     public function __construct() {
       $upload_dir = wp_upload_dir();
-      $bwg_options = $this->get_options_data();
-      $this->uploads_dir = (($bwg_options->images_directory . '/photo-gallery') ? ABSPATH . $bwg_options->images_directory . '/photo-gallery' : WD_BWG_DIR . '/filemanager/uploads');
+      global $wd_bwg_options;
+      $this->uploads_dir = (($wd_bwg_options->images_directory . '/photo-gallery') ? ABSPATH . $wd_bwg_options->images_directory . '/photo-gallery' : WD_BWG_DIR . '/filemanager/uploads');
       if (file_exists($this->uploads_dir) == FALSE) {
         mkdir($this->uploads_dir);
       }
-      $this->uploads_url = (($bwg_options->images_directory . '/photo-gallery') ? site_url() . '/' . $bwg_options->images_directory . '/photo-gallery' : WD_BWG_URL . '/filemanager/uploads');
+      $this->uploads_url = (($wd_bwg_options->images_directory . '/photo-gallery') ? site_url() . '/' . $wd_bwg_options->images_directory . '/photo-gallery' : WD_BWG_URL . '/filemanager/uploads');
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////
     // Public Methods                                                                     //
     ////////////////////////////////////////////////////////////////////////////////////////
-
-    public function get_options_data() {
-      global $wpdb;
-      $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . $wpdb->prefix . 'bwg_option WHERE id="%d"', 1));
-      return $row;
-    }
-
     public function execute() {
       $task = isset($_REQUEST['task']) ? stripslashes(esc_html($_REQUEST['task'])) : 'display';
       if (method_exists($this, $task)) {
@@ -75,7 +68,7 @@ class FilemanagerController {
       $input_dir = htmlspecialchars_decode($input_dir, ENT_COMPAT | ENT_QUOTES);
       $cur_dir_path = $input_dir == '' ? $this->uploads_dir : $this->uploads_dir . '/' . $input_dir;
 
-      $new_dir_path = $cur_dir_path . '/' . (isset($_REQUEST['new_dir_name']) ? stripslashes(esc_html($_REQUEST['new_dir_name'])) : '');
+      $new_dir_path = $cur_dir_path . '/' . (isset($_REQUEST['new_dir_name']) ? stripslashes(esc_html(sanitize_file_name($_REQUEST['new_dir_name']))) : '');
       $new_dir_path = htmlspecialchars_decode($new_dir_path, ENT_COMPAT | ENT_QUOTES);
       $msg = '';
       if (file_exists($new_dir_path) == true) {
@@ -111,7 +104,7 @@ class FilemanagerController {
         $msg = "File doesn't exist.";
       }
       elseif (is_dir($file_path) == true) {
-        if (rename($file_path, $cur_dir_path . '/' . $file_new_name) == false) {
+        if (rename($file_path, $cur_dir_path . '/' . sanitize_file_name($file_new_name)) == false) {
           $msg = "Can't rename the file.";
         }
       }

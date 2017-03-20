@@ -47,24 +47,68 @@ final class NF_Actions_Email extends NF_Abstracts_Action
 
     public function process( $action_settings, $form_id, $data )
     {
+        $errors = $this->check_for_errors( $action_settings );
+
         $headers = $this->_get_headers( $action_settings );
 
         $attachments = $this->_get_attachments( $action_settings, $data );
 
-        $sent = wp_mail(
-            $action_settings['to'],
-            $action_settings['email_subject'],
-            $action_settings['email_message'],
-            $headers,
-            $attachments
-        );
+        if( 'html' == $action_settings[ 'email_format' ] ) {
+            $message = $action_settings['email_message'];
+        } else {
+            $message = $this->format_plain_text_message( $action_settings[ 'email_message_plain' ] );
+        }
+
+        $message = apply_filters( 'ninja_forms_action_email_message', $message, $data, $action_settings );
+
+        try {
+            $sent = wp_mail($action_settings['to'], $action_settings['email_subject'], $message, $headers, $attachments);
+        } catch ( Exception $e ){
+            $sent = false;
+            $errors[ 'email_sent' ] = $e->getMessage();
+        }
 
         $data[ 'actions' ][ 'email' ][ 'to' ] = $action_settings['to'];
         $data[ 'actions' ][ 'email' ][ 'sent' ] = $sent;
         $data[ 'actions' ][ 'email' ][ 'headers' ] = $headers;
         $data[ 'actions' ][ 'email' ][ 'attachments' ] = $attachments;
 
+        if( $errors ){
+            $data[ 'errors' ][ 'form' ] = $errors;
+        }
+        
+        if ( ! empty( $attachments ) ) {
+            $this->_drop_csv();
+        }
+
         return $data;
+    }
+
+    protected function check_for_errors( $action_settings )
+    {
+        $errors = array();
+
+        $email_address_settings = array( 'to', 'from_address', 'reply_to', 'cc', 'bcc' );
+
+        foreach( $email_address_settings as $setting ){
+            if( ! isset( $action_settings[ $setting ] ) ) continue;
+            if( ! $action_settings[ $setting ] ) continue;
+
+
+            $email_addresses = is_array( $action_settings[ $setting ] ) ? $action_settings[ $setting ] : explode( ',', $action_settings[ $setting ] );
+            foreach( (array) $email_addresses as $email ){
+                $email = trim( $email );
+                if ( false !== strpos( $email, '<' ) && false !== strpos( $email, '>' ) ) {
+                    preg_match('/(?<=<).*?(?=>)/', $email, $email);
+                    $email = $email[ 0 ];
+                }
+                if( ! is_email( $email ) ) {
+                    $errors[ 'email_' . $email ] = sprintf( __( 'Your email action "%s" has an invalid value for the "%s" setting. Please check this setting and try again.', 'ninja-forms'), $action_settings[ 'label' ], $setting );
+                }
+            }
+        }
+
+        return $errors;
     }
 
     private function _get_headers( $settings )
@@ -85,7 +129,7 @@ final class NF_Actions_Email extends NF_Abstracts_Action
     {
         $attachments = array();
 
-        if( $settings[ 'attach_csv' ] ){
+        if( 1 == $settings[ 'attach_csv' ] ){
             $attachments[] = $this->_create_csv( $data[ 'fields' ] );
         }
 
@@ -127,7 +171,12 @@ final class NF_Actions_Email extends NF_Abstracts_Action
 
                 if( ! $email ) continue;
 
-                $headers[] = $this->_format_recipient($type, $email);
+                $matches = array();
+                if (preg_match('/^"?(?<name>[^<"]+)"? <(?<email>[^>]+)>$/', $email, $matches)) {
+                    $headers[] = $this->_format_recipient($type, $matches['email'], $matches['name']);
+                } else {
+                    $headers[] = $this->_format_recipient($type, $email);
+                }
             }
         }
 
@@ -152,6 +201,8 @@ final class NF_Actions_Email extends NF_Abstracts_Action
         foreach( $fields as $field ){
 
             if( ! isset( $field[ 'label' ] ) ) continue;
+            if( 'hr' == $field['type'] ) continue;
+            if( 'submit' == $field['type'] ) continue;
 
             $csv_array[ 0 ][] = $field[ 'label' ];
             $csv_array[ 1 ][] = WPN_Helper::stripslashes( $field[ 'value' ] );
@@ -191,6 +242,23 @@ final class NF_Actions_Email extends NF_Abstracts_Action
         rename( $dir.'/'.$basename, $dir.'/'.$new_name.'.csv' );
         return $dir.'/'.$new_name.'.csv';
     }
+    
+    /**
+     * Function to delete csv file from temp directory after Email Action has completed.
+     */
+    private function _drop_csv()
+    {
+        $upload_dir = wp_upload_dir();
+        $path = trailingslashit( $upload_dir['path'] );
+
+        // create name for file
+        $new_name = apply_filters( 'ninja_forms_submission_csv_name', 'ninja-forms-submission' );
+
+        // remove a file if it already exists
+        if( file_exists( $path.'/'.$new_name.'.csv' ) ) {
+            unlink( $path.'/'.$new_name.'.csv' );
+        }
+    }
 
     /*
      * Backwards Compatibility
@@ -222,5 +290,13 @@ final class NF_Actions_Email extends NF_Abstracts_Action
     public function ninja_forms_action_email_attachments( $attachments, $form_data, $action_settings )
     {
         return apply_filters( 'nf_email_notification_attachments', $attachments, $action_settings[ 'id' ] );
+    }
+
+    private function format_plain_text_message( $message )
+    {
+        $message =  str_replace( array( '<table>', '</table>', '<tr><td>', '' ), '', $message );
+        $message =  str_replace( '</td><td>', ' ', $message );
+        $message =  str_replace( '</td></tr>', "\r\n", $message );
+        return strip_tags( $message );
     }
 }

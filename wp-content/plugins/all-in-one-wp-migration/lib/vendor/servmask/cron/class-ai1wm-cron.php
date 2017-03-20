@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2016 ServMask Inc.
+ * Copyright (C) 2014-2017 ServMask Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,6 +37,7 @@ class Ai1wm_Cron {
 	public static function add( $hook, $recurrence, $args = array() ) {
 		$args      = array_slice( func_get_args(), 2 );
 		$schedules = wp_get_schedules();
+
 		if ( isset( $schedules[$recurrence] ) && ( $current = $schedules[$recurrence] ) ) {
 			return wp_schedule_event( time() + $current['interval'], $recurrence, $hook, $args );
 		}

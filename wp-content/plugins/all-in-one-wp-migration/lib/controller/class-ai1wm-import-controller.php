@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2016 ServMask Inc.
+ * Copyright (C) 2014-2017 ServMask Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -62,19 +62,32 @@ class Ai1wm_Import_Controller {
 		}
 
 		// Get hook
-		if ( isset( $wp_filter['ai1wm_import'] ) && ( $filters = $wp_filter['ai1wm_import'] ) && ksort( $filters ) ) {
+		if ( isset( $wp_filter['ai1wm_import'] ) && ( $filters = $wp_filter['ai1wm_import'] ) ) {
+			// WordPress 4.7 introduces new class for working with filters/actions called WP_Hook
+			// which adds another level of abstraction and we need to address it.
+			if ( is_object( $filters ) ) {
+				$filters = current( $filters );
+			}
+
+			ksort( $filters );
+
+			// Loop over filters
 			while ( $hooks = current( $filters ) ) {
-				if ( $priority == key( $filters ) ) {
-					foreach ( $hooks as  $hook ) {
+				if ( $priority === key( $filters ) ) {
+					foreach ( $hooks as $hook ) {
 						try {
+
+							// Run function hook
 							$params = call_user_func_array( $hook['function'], array( $params ) );
-						}
-						catch ( Ai1wm_Import_Retry_Exception $exception ) {
-							status_header( $exception->getCode() );
-							wp_send_json_error( array( 'message' => $exception->getMessage() ) );
+
+							// Log request
+							Ai1wm_Log::import( $params );
+
+						} catch ( Ai1wm_Import_Retry_Exception $e ) {
+							status_header( $e->getCode() );
+							echo json_encode( array( 'message' => $e->getMessage() ) );
 							exit;
-						}
-						catch ( Exception $e ) {
+						} catch ( Exception $e ) {
 							Ai1wm_Status::error( $e->getMessage(), __( 'Unable to import', AI1WM_PLUGIN_NAME ) );
 							exit;
 						}
@@ -86,14 +99,14 @@ class Ai1wm_Import_Controller {
 						$completed = (bool) $params['completed'];
 					}
 
-					// Log request
-					if ( empty( $params['priority'] ) || is_file( ai1wm_import_path( $params ) ) ) {
-						Ai1wm_Log::import( $params );
-					}
-
 					// Do request
 					if ( $completed === false || ( $next = next( $filters ) ) && ( $params['priority'] = key( $filters ) ) ) {
-						return Ai1wm_Http::post( admin_url( 'admin-ajax.php?action=ai1wm_import' ), $params );
+						if ( isset( $params['ai1wm_manual_import'] ) || isset( $params['ai1wm_manual_backups'] ) ) {
+							echo json_encode( $params );
+							exit;
+						}
+
+						return Ai1wm_Http::get( admin_url( 'admin-ajax.php?action=ai1wm_import' ), $params );
 					}
 				}
 
@@ -111,6 +124,7 @@ class Ai1wm_Import_Controller {
 			apply_filters( 'ai1wm_import_gdrive', Ai1wm_Template::get_content( 'import/button-gdrive' ) ),
 			apply_filters( 'ai1wm_import_s3', Ai1wm_Template::get_content( 'import/button-s3' ) ),
 			apply_filters( 'ai1wm_import_onedrive', Ai1wm_Template::get_content( 'import/button-onedrive' ) ),
+			apply_filters( 'ai1wm_import_box', Ai1wm_Template::get_content( 'import/button-box' ) ),
 		);
 	}
 

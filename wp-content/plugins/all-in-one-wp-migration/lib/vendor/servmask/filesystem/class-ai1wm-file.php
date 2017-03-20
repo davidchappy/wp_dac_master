@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2016 ServMask Inc.
+ * Copyright (C) 2014-2017 ServMask Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,12 +37,12 @@ class Ai1wm_File {
 	 */
 	public static function create( $path, $contents ) {
 		if ( ! is_file( $path ) ) {
-			$handle = fopen( $path, 'w' );
+			$handle = ai1wm_open( $path, 'w' );
 			if ( false === $handle ) {
 				return false;
 			}
-			fwrite( $handle, $contents );
-			fclose( $handle );
+			ai1wm_write( $handle, $contents );
+			ai1wm_close( $handle );
 		}
 	}
 }

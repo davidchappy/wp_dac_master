@@ -141,7 +141,12 @@ abstract class NF_Abstracts_Field
     {
         $errors = array();
         // Required check.
-        if( isset( $field['required'] ) && $field['required'] && ! trim( $field['value'] ) ){
+
+        if( is_array( $field[ 'value' ] ) ){
+            $field[ 'value' ] = implode( '', $field[ 'value' ] );
+        }
+
+        if( isset( $field['required'] ) && 1 == $field['required'] && is_null( trim( $field['value'] ) ) ){
             $errors[] = 'Field is required.';
         }
         return $errors;
@@ -282,7 +287,7 @@ abstract class NF_Abstracts_Field
 
     public static function sort_by_order( $a, $b )
     {
-        return strcmp( $a->get_setting( 'order' ), $b->get_setting( 'order' ) );
+        return $a->get_setting( 'order' ) - $b->get_setting( 'order' );
     }
 
     public function localize_settings( $settings, $form_id ) {

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2016 ServMask Inc.
+ * Copyright (C) 2014-2017 ServMask Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,22 +28,10 @@ class Ai1wm_Backups_Controller {
 	public static function index() {
 		$model = new Ai1wm_Backups;
 
-		// Username
-		if ( isset( $_POST['ai1wm-username'] ) ) {
-			update_option( AI1WM_AUTH_USER, $_POST['ai1wm-username'] );
-		}
-
-		// Password
-		if ( isset( $_POST['ai1wm-password'] ) ) {
-			update_option( AI1WM_AUTH_PASSWORD, $_POST['ai1wm-password'] );
-		}
-
 		Ai1wm_Template::render(
 			'backups/index',
 			array(
 				'backups'     => $model->get_files(),
-				'free_space'  => $model->get_free_space(),
-				'total_space' => $model->get_total_space(),
 				'username'    => get_option( AI1WM_AUTH_USER ),
 				'password'    => get_option( AI1WM_AUTH_PASSWORD ),
 			)

@@ -59,6 +59,13 @@ $duplicate_post_status = array('draft','publish','private','pending');
     <p><?php _e('Please select any post redirection, redirect you to selected after click on duplicate this link. <strong>Default:</strong> To current list.', 'duplicate_page')?></p>
 </td>
 </tr>
+<tr>
+<th scope="row"><label for="duplicate_post_suffix"><?php _e('Duplicate Post Suffix', 'duplicate_page')?></label></th>
+<td>
+ <input type="text" class="regular-text" value="<?php echo !empty($opt['duplicate_post_suffix']) ? $opt['duplicate_post_suffix'] : ''?>" id="duplicate_post_suffix" name="duplicate_post_suffix">
+    <p><?php _e('Add a suffix for duplicate or clone post as Copy, Clone etc. It will show after title.', 'duplicate_page')?></p>
+</td>
+</tr>
 </tbody></table>
 <p class="submit"><input type="submit" value="Save Changes" class="button button-primary" id="submit" name="submit_duplicate_page"></p>
 </form>
@@ -77,6 +84,7 @@ $duplicate_post_status = array('draft','publish','private','pending');
     </form>
       <hr />
     </div>
+<?php echo $this->duplicate_page_adsense();?>    
 </div>
 </div>
 </div>
